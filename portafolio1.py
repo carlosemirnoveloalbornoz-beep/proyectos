@@ -1,12 +1,18 @@
 """Generador propio de numeros pseudoaleatorios y sus estadisticas."""
 
 import argparse
+import matplotlib
+matplotlib.use("Agg")  # evita fallos en terminal sin GUI
 import matplotlib.pyplot as plt
 
 
 class MersenneTwister:
     """Implementacion del algoritmo MT19937 sin usar la libreria random."""
+
     def __init__(self, seed: int):
+        if not isinstance(seed, int):
+            raise TypeError("La semilla debe ser un entero.")
+
         self.w = 32
         self.n = 624
         self.m = 397
@@ -25,7 +31,7 @@ class MersenneTwister:
         self.upper_mask = (~self.lower_mask) & 0xFFFFFFFF
 
         self.mt = [0] * self.n
-        self.index = self.n + 1
+        self.index = self.n  # <- corregido
 
         self.mt[0] = seed & 0xFFFFFFFF
         for i in range(1, self.n):
@@ -33,7 +39,7 @@ class MersenneTwister:
                 self.f * (self.mt[i - 1] ^ (self.mt[i - 1] >> (self.w - 2))) + i
             ) & 0xFFFFFFFF
 
-    def _twist(self):
+    def _twist(self) -> None:
         for i in range(self.n):
             x = (self.mt[i] & self.upper_mask) + (self.mt[(i + 1) % self.n] & self.lower_mask)
             xA = x >> 1
@@ -56,7 +62,7 @@ class MersenneTwister:
         y ^= (y << self.t) & self.c
         y ^= (y >> self.l)
 
-        return y / 4294967296.0  # intervalo [0, 1)
+        return (y & 0xFFFFFFFF) / 4294967296.0  # intervalo [0, 1)
 
 
 def generar_numeros(cantidad: int, semilla: int) -> list[float]:
@@ -78,14 +84,15 @@ def mostrar_resultados(numeros: list[float]) -> None:
 
 
 def graficar_histograma(numeros: list[float]) -> None:
-    """Muestra un histograma de los numeros generados."""
+    """Genera un histograma de los numeros pseudoaleatorios."""
     plt.hist(numeros, bins=10, edgecolor="black")
     plt.title("Histograma de numeros pseudoaleatorios")
     plt.xlabel("Valor")
     plt.ylabel("Frecuencia")
     plt.grid(axis="y", alpha=0.3)
     plt.tight_layout()
-    plt.show()
+    plt.savefig("histograma.png", dpi=150)
+    plt.close()
 
 
 def leer_argumentos() -> tuple[int, int]:
