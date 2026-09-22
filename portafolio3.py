@@ -24,7 +24,7 @@ class MersenneTwister:
         self.lower_mask = (1 << self.r) - 1
         self.upper_mask = (~self.lower_mask) & 0xFFFFFFFF
         self.mt = [0] * self.n
-        self.index = self.n + 1
+        self.index = self.n  # <- aqui estaba el problema
 
         self.mt[0] = seed & 0xFFFFFFFF
         for i in range(1, self.n):
@@ -112,7 +112,29 @@ def simular_propagacion(
     return dias
 
 
-def leer_argumentos() -> tuple[int, int, float, int]:
+def leer_entero(prompt: str, por_defecto: int | None = None) -> int:
+    while True:
+        valor = input(prompt).strip()
+        if valor == "" and por_defecto is not None:
+            return por_defecto
+        try:
+            return int(valor)
+        except ValueError:
+            print("Debe ser un entero.")
+
+
+def leer_decimal(prompt: str, por_defecto: float | None = None) -> float:
+    while True:
+        valor = input(prompt).strip()
+        if valor == "" and por_defecto is not None:
+            return por_defecto
+        try:
+            return float(valor)
+        except ValueError:
+            print("Debe ser un número.")
+
+
+def leer_argumentos() -> tuple[int, int, float, int, bool]:
     """Obtiene los parametros desde argumentos o mediante entrada interactiva."""
     parser = argparse.ArgumentParser(
         description="Simula la propagacion de un virus en una poblacion."
@@ -120,31 +142,55 @@ def leer_argumentos() -> tuple[int, int, float, int]:
     parser.add_argument("habitantes", type=int, nargs="?")
     parser.add_argument("lugares", type=int, nargs="?")
     parser.add_argument("probabilidad", type=float, nargs="?")
-    parser.add_argument("semilla", type=int, nargs="?", default=1)
-    argumentos = parser.parse_args()
+    parser.add_argument("semilla", type=int, nargs="?", default=None)
+    parser.add_argument(
+        "-s",
+        "--semilla",
+        dest="semilla_opcional",
+        type=int,
+        help="Semilla para el generador aleatorio.",
+    )
 
-    valores = (argumentos.habitantes, argumentos.lugares, argumentos.probabilidad)
-    if all(valor is not None for valor in valores):
-        return argumentos.habitantes, argumentos.lugares, argumentos.probabilidad, argumentos.semilla
-    if any(valor is not None for valor in valores):
+    args = parser.parse_args()
+    semilla = args.semilla_opcional if args.semilla_opcional is not None else args.semilla
+    hay_semilla = args.semilla_opcional is not None or args.semilla is not None
+
+    if args.habitantes is None and args.lugares is None and args.probabilidad is None:
+        semilla_interactiva = leer_entero("Semilla (1 por defecto): ", 1)
+        return (
+            leer_entero("Numero de habitantes: "),
+            leer_entero("Numero de lugares con asistencia masiva: "),
+            leer_decimal("Probabilidad de contagio (0 a 1): "),
+            semilla_interactiva,
+            True,
+        )
+
+    if any(v is None for v in (args.habitantes, args.lugares, args.probabilidad)):
         parser.error("Debe indicar habitantes, lugares y probabilidad juntos.")
 
-    return (
-        int(input("Numero de habitantes: ")),
-        int(input("Numero de lugares con asistencia masiva: ")),
-        float(input("Probabilidad de contagio (0 a 1): ")),
-        int(input("Semilla (por defecto 1): ") or "1"),
-    )
+    if semilla is None:
+        semilla = 1
+
+    return args.habitantes, args.lugares, args.probabilidad, semilla, hay_semilla
 
 
 def main() -> None:
-    habitantes, lugares, probabilidad, semilla = leer_argumentos()
-    dias = simular_propagacion(habitantes, lugares, probabilidad, semilla)
-    if dias == -1:
-        print("El virus no alcanzo el 80% de la poblacion.")
-    else:
-        print(f"El virus tardo {dias} dias en infectar al 80% de la poblacion.")
+    try:
+        habitantes, lugares, probabilidad, semilla, hay_semilla = leer_argumentos()
 
+        if not hay_semilla:
+            print("No hay semilla especificada. Se usa la semilla por defecto: 1.")
+
+        dias = simular_propagacion(habitantes, lugares, probabilidad, semilla)
+
+        if dias == -1:
+            print("El virus no alcanzo el 80% de la poblacion.")
+        else:
+            print(f"El virus tardo {dias} dias en infectar al 80% de la poblacion.")
+    except ValueError as e:
+        print(f"Error: {e}")
+    except KeyboardInterrupt:
+        print("\nEjecucion interrumpida.")
 
 if __name__ == "__main__":
     main()
